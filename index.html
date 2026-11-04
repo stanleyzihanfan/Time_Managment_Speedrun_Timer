@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Timer Organizer</title>
+<meta name="theme-color" content="#1c2331">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="clock">
+    <div class="stat">
+      <span class="label">Total time</span>
+      <span id="total" class="num">0:00</span>
+    </div>
+    <div class="stat">
+      <span class="label">Expected end</span>
+      <span id="endTime" class="num">--:--</span>
+      <span id="endIn" class="sub"></span>
+    </div>
+  </header>
+
+  <section class="current" aria-live="off">
+    <div class="curName" id="curName">Off-Track</div>
+    <div class="curTimes">
+      <span id="curDiff" class="diff"></span>
+      <span id="curTime" class="big">0:00.0</span>
+    </div>
+  </section>
+
+  <section class="controls">
+    <button id="runBtn" class="primary">Start</button>
+    <button id="finishBtn">Finish split</button>
+    <button id="addBtn">Add task</button>
+    <button id="settingsBtn" aria-label="Settings">Settings</button>
+  </section>
+
+  <ul id="splits" class="splits"></ul>
+  <p id="empty" class="empty" hidden>No tasks yet. Add one with an estimated time to create your first split.</p>
+</main>
+
+<dialog id="taskDlg">
+  <form id="taskForm">
+    <h2 id="taskDlgTitle">Add task</h2>
+    <label>Name <input id="taskName" required maxlength="80" autocomplete="off"></label>
+    <label>Estimated time (minutes) <input id="taskEst" type="number" min="0" step="any" value="25" required inputmode="decimal"></label>
+    <div class="row">
+      <button type="button" id="taskCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDlg">
+  <div class="dlgBody">
+    <h2>Settings</h2>
+
+    <h3>Data</h3>
+    <div class="row wrap">
+      <button id="exportBtn">Export to file</button>
+      <button id="importBtn">Import from file</button>
+      <button id="resetBtn">Reset run</button>
+      <button id="clearBtn" class="danger">Delete all tasks</button>
+    </div>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
+
+    <h3>Sync (Firestore)</h3>
+    <p id="syncStatus" class="muted">Not configured.</p>
+    <label>Firebase config
+      <textarea id="cfgText" rows="6" spellcheck="false" placeholder='Paste the firebaseConfig object from the Firebase console'></textarea>
+    </label>
+    <div class="row wrap">
+      <button id="cfgSave">Save config</button>
+      <button id="cfgClear">Remove config</button>
+    </div>
+    <div id="authBox" hidden>
+      <label>Email <input id="email" type="email" autocomplete="username"></label>
+      <label>Password <input id="password" type="password" autocomplete="current-password"></label>
+      <div class="row wrap">
+        <button id="signInBtn" class="primary">Sign in</button>
+        <button id="signUpBtn">Create account</button>
+      </div>
+    </div>
+    <div id="signedBox" hidden class="row wrap">
+      <button id="signOutBtn">Sign out</button>
+    </div>
+
+    <div class="row"><button id="settingsClose" class="primary">Close</button></div>
+  </div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
