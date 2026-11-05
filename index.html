@@ -10,9 +10,25 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<script>
+/* Apply saved theme before first paint to avoid a flash. */
+try {
+  var p = JSON.parse(localStorage.getItem("timerOrganizer.prefs") || "{}");
+  var t = p.theme || "system";
+  if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.dataset.theme = t;
+  document.documentElement.dataset.transparent = String(!!p.transparent);
+} catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="popNote" class="popNote" hidden>
+  <p>The timer is open in the pop-out window.</p>
+  <button id="popBack" class="primary">Bring back</button>
+</div>
+
+<div id="app">
 <main>
   <header class="clock">
     <div class="stat">
@@ -38,7 +54,23 @@
     <button id="runBtn" class="primary">Start</button>
     <button id="finishBtn">Finish split</button>
     <button id="addBtn">Add task</button>
+  </section>
+  <section class="controls secondary">
+    <button id="bulkBtn">Select</button>
+    <button id="resetTimesBtn">Reset times</button>
+    <button id="resetRunBtn" class="danger">Reset run</button>
+    <button id="popBtn" hidden>Pop out</button>
     <button id="settingsBtn" aria-label="Settings">Settings</button>
+  </section>
+
+  <section id="bulkBar" class="controls bulk" hidden>
+    <span id="bulkCount" class="muted">0 selected</span>
+    <button id="bulkAll">Select all</button>
+    <button id="bulkDone">Mark done</button>
+    <button id="bulkOpen">Reopen</button>
+    <button id="bulkReset">Reset time</button>
+    <button id="bulkEst">Set estimate</button>
+    <button id="bulkDel" class="danger">Delete</button>
   </section>
 
   <ul id="splits" class="splits"></ul>
@@ -57,16 +89,47 @@
   </form>
 </dialog>
 
+<dialog id="estDlg">
+  <form id="estForm">
+    <h2>Set estimate</h2>
+    <label>Estimated time (minutes) for selected tasks <input id="estVal" type="number" min="0" step="any" value="25" required inputmode="decimal"></label>
+    <div class="row">
+      <button type="button" id="estCancel">Cancel</button>
+      <button type="submit" class="primary">Apply</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="askDlg">
+  <div class="dlgBody">
+    <p id="askMsg" class="askMsg"></p>
+    <div class="row">
+      <button id="askCancel">Cancel</button>
+      <button id="askOk" class="primary">OK</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="settingsDlg">
   <div class="dlgBody">
     <h2>Settings</h2>
+
+    <h3>Appearance</h3>
+    <label>Theme
+      <select id="themeSel">
+        <option value="system">System</option>
+        <option value="dark">Dark (night)</option>
+        <option value="light">Light</option>
+      </select>
+    </label>
+    <label class="check"><input id="transChk" type="checkbox"> Transparent background</label>
+    <label class="check"><input id="topChk" type="checkbox"> Always on top (pop-out window)</label>
+    <p id="topNote" class="muted"></p>
 
     <h3>Data</h3>
     <div class="row wrap">
       <button id="exportBtn">Export to file</button>
       <button id="importBtn">Import from file</button>
-      <button id="resetBtn">Reset run</button>
-      <button id="clearBtn" class="danger">Delete all tasks</button>
     </div>
     <input id="importFile" type="file" accept="application/json,.json" hidden>
 
@@ -94,6 +157,7 @@
     <div class="row"><button id="settingsClose" class="primary">Close</button></div>
   </div>
 </dialog>
+</div>
 
 <script src="app.js"></script>
 </body>

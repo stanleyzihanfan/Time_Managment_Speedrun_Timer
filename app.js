@@ -3,7 +3,10 @@
 /* ---------- State ---------- */
 const KEY = "timerOrganizer.v1";
 const CFG_KEY = "timerOrganizer.firebase";
-const $ = (s) => document.querySelector(s);
+const PREF_KEY = "timerOrganizer.prefs";
+const app = document.getElementById("app");
+// Scoped to #app so it keeps working when #app is moved into the pop-out window.
+const $ = (s) => app.querySelector(s) || document.querySelector(s);
 const now = () => Date.now();
 const uid = () => Math.random().toString(36).slice(2, 10) + now().toString(36);
 
@@ -42,6 +45,10 @@ function load() {
 let state = load();
 let editingId = null;
 
+// Bulk-select mode (UI only, not saved or synced)
+let bulk = false;
+const bulkSel = new Set();
+
 const selTask = () => state.tasks.find((t) => t.id === state.selectedId) || null;
 
 /* Move running time into the active entry (selected task or Off-Track). */
@@ -70,6 +77,119 @@ function mutate(fn) {
   commit();
   fn();
   save();
+}
+
+/* ---------- Preferences (per device) ---------- */
+const PREF_DEFAULTS = { theme: "system", transparent: false, onTop: false };
+function loadPrefs() {
+  try { return { ...PREF_DEFAULTS, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") }; }
+  catch { return { ...PREF_DEFAULTS }; }
+}
+let prefs = loadPrefs();
+function savePrefs() {
+  try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {}
+}
+
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const docs = () => (pip ? [document, pip.document] : [document]);
+
+function applyPrefs() {
+  const theme = prefs.theme === "system" ? (darkQuery.matches ? "dark" : "light") : prefs.theme;
+  for (const d of docs()) {
+    d.documentElement.dataset.theme = theme;
+    d.documentElement.dataset.transparent = String(!!prefs.transparent);
+  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = theme === "light" ? "#f3f5f9" : "#1c2331";
+}
+darkQuery.addEventListener("change", () => { if (prefs.theme === "system") applyPrefs(); });
+
+function syncPrefsUI() {
+  $("#themeSel").value = prefs.theme;
+  $("#transChk").checked = !!prefs.transparent;
+  $("#topChk").checked = prefs.onTop && pipSupported;
+  $("#topChk").disabled = !pipSupported;
+  $("#topNote").textContent = pipSupported
+    ? "Opens the timer in a small pop-out window that stays above other apps. Close it to come back here."
+    : "Not supported in this browser. Needs desktop Chrome or Edge 116 or newer.";
+}
+
+/* ---------- Always on top (Document Picture-in-Picture) ---------- */
+const pipSupported = "documentPictureInPicture" in window;
+let pip = null;
+
+async function popOut() {
+  if (!pipSupported || pip) return;
+  try {
+    const w = await window.documentPictureInPicture.requestWindow({ width: 360, height: 520 });
+    pip = w;
+    for (const ss of [...document.styleSheets]) {
+      try {
+        const st = w.document.createElement("style");
+        st.textContent = [...ss.cssRules].map((r) => r.cssText).join("\n");
+        w.document.head.appendChild(st);
+      } catch {
+        if (ss.href) {
+          const l = w.document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = ss.href;
+          w.document.head.appendChild(l);
+        }
+      }
+    }
+    w.document.title = document.title;
+    applyPrefs();
+    w.document.body.append(app);
+    w.document.addEventListener("keydown", onKey);
+    w.addEventListener("pagehide", () => {
+      document.body.prepend(app);
+      pip = null;
+      updatePopUI();
+    });
+    updatePopUI();
+  } catch (e) {
+    pip = null;
+    updatePopUI();
+  }
+}
+
+function closePip() { if (pip) pip.close(); }
+
+function updatePopUI() {
+  $("#popBtn").hidden = !(pipSupported && prefs.onTop && !pip);
+  document.getElementById("popNote").hidden = !pip;
+}
+
+/* ---------- Dialog helpers (browser confirm/alert don't work well in the pop-out) ---------- */
+function ask(msg, ok = "OK", cancel = true) {
+  return new Promise((res) => {
+    const dlg = $("#askDlg");
+    $("#askMsg").textContent = msg;
+    $("#askOk").textContent = ok;
+    $("#askCancel").hidden = !cancel;
+    const done = (v) => { res(v); dlg.close(); };
+    $("#askOk").onclick = () => done(true);
+    $("#askCancel").onclick = () => done(false);
+    dlg.onclose = () => res(false);
+    dlg.showModal();
+  });
+}
+
+function askEst() {
+  return new Promise((res) => {
+    const dlg = $("#estDlg");
+    $("#estVal").value = 25;
+    $("#estForm").onsubmit = (e) => {
+      e.preventDefault();
+      const v = parseFloat($("#estVal").value);
+      res(isNaN(v) ? null : Math.max(0, v));
+      dlg.close();
+    };
+    $("#estCancel").onclick = () => { res(null); dlg.close(); };
+    dlg.onclose = () => res(null);
+    dlg.showModal();
+    $("#estVal").select();
+  });
 }
 
 /* ---------- Time helpers ---------- */
@@ -147,9 +267,9 @@ function submitTask(e) {
   $("#taskDlg").close();
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
   const t = state.tasks.find((x) => x.id === id);
-  if (!t || !confirm(`Delete "${t.name}"?`)) return;
+  if (!t || !(await ask(`Delete "${t.name}"?`, "Delete"))) return;
   mutate(() => {
     state.tasks = state.tasks.filter((x) => x.id !== id);
     if (state.selectedId === id) state.selectedId = null;
@@ -163,21 +283,72 @@ function reopenTask(id) {
   });
 }
 
-function resetRun() {
-  if (!confirm("Reset all times and mark every task as not done?")) return;
+/* Reset run: delete every split and clear all times. */
+async function resetRun() {
+  if (!(await ask("Reset the run? This deletes all splits and clears every time.", "Reset run"))) return;
+  bulk = false;
+  bulkSel.clear();
+  state = blank();
+  save();
+}
+
+/* Reset times: keep the tasks, zero every split and the main timer. */
+async function resetTimes() {
+  if (!(await ask("Reset the main timer and the time on every split? Your tasks stay.", "Reset times"))) return;
   mutate(() => {
     state.tasks.forEach((t) => { t.elapsed = 0; t.done = false; });
     state.offTrack = 0;
     state.totalAccum = 0;
-    state.selectedId = null;
     state.running = false;
   });
 }
 
-function clearAll() {
-  if (!confirm("Delete all tasks and times? Export first if you want a backup.")) return;
-  state = blank();
-  save();
+/* ---------- Bulk operations ---------- */
+function setBulk(on) {
+  bulk = on;
+  bulkSel.clear();
+  render();
+}
+
+function toggleBulkId(id) {
+  if (bulkSel.has(id)) bulkSel.delete(id); else bulkSel.add(id);
+  render();
+}
+
+function bulkAll() {
+  if (bulkSel.size === state.tasks.length) bulkSel.clear();
+  else state.tasks.forEach((t) => bulkSel.add(t.id));
+  render();
+}
+
+async function bulkDo(act) {
+  const ids = new Set(bulkSel);
+  if (!ids.size) return;
+  let minutes = null;
+  if (act === "del") {
+    if (!(await ask(`Delete ${ids.size} selected task${ids.size > 1 ? "s" : ""}?`, "Delete"))) return;
+  } else if (act === "est") {
+    minutes = await askEst();
+    if (minutes == null) return;
+  }
+  mutate(() => {
+    const ts = state.tasks.filter((t) => ids.has(t.id));
+    if (act === "del") {
+      state.tasks = state.tasks.filter((t) => !ids.has(t.id));
+      if (ids.has(state.selectedId)) state.selectedId = null;
+    } else if (act === "done") {
+      ts.forEach((t) => { t.done = true; });
+      if (ids.has(state.selectedId)) state.selectedId = null;
+    } else if (act === "open") {
+      ts.forEach((t) => { t.done = false; });
+    } else if (act === "reset") {
+      ts.forEach((t) => { t.elapsed = 0; });
+    } else if (act === "est") {
+      ts.forEach((t) => { t.est = minutes * 60000; });
+    }
+  });
+  if (act === "del") bulkSel.clear();
+  render();
 }
 
 /* ---------- Rendering ---------- */
@@ -188,24 +359,30 @@ function esc(s) {
 }
 
 function render() {
+  for (const id of [...bulkSel]) if (!state.tasks.some((t) => t.id === id)) bulkSel.delete(id);
+
   const ul = $("#splits");
   refs = {};
   ul.innerHTML = "";
   for (const t of state.tasks) {
+    const checked = bulk && bulkSel.has(t.id);
     const li = document.createElement("li");
-    li.className = "split" + (t.done ? " done" : "") + (t.id === state.selectedId ? " sel" : "");
+    li.className = "split" + (t.done ? " done" : "") + (!bulk && t.id === state.selectedId ? " sel" : "") + (checked ? " checked" : "");
     li.dataset.id = t.id;
     li.tabIndex = 0;
-    li.innerHTML =
-      `<span class="name">${esc(t.name)}</span><span class="diff"></span><span class="time"></span>` +
-      `<span class="meta">Estimate ${fmt(t.est)}${t.done ? " · finished" : ""}</span>` +
+    if (bulk) { li.setAttribute("role", "checkbox"); li.setAttribute("aria-checked", String(checked)); }
+    const box = bulk ? `<input type="checkbox" tabindex="-1" aria-hidden="true"${checked ? " checked" : ""}>` : "";
+    const tools = bulk ? "" :
       `<span class="tools">${t.done ? '<button data-act="reopen">Reopen</button>' : ""}` +
       `<button data-act="edit">Edit</button><button data-act="del">Delete</button></span>`;
+    li.innerHTML =
+      `<span class="name">${box}${esc(t.name)}</span><span class="diff"></span><span class="time"></span>` +
+      `<span class="meta">Estimate ${fmt(t.est)}${t.done ? " · finished" : ""}</span>` + tools;
     ul.appendChild(li);
     refs[t.id] = { diff: li.querySelector(".diff"), time: li.querySelector(".time") };
   }
   const off = document.createElement("li");
-  off.className = "split off" + (!state.selectedId ? " sel" : "");
+  off.className = "split off" + (!state.selectedId && !bulk ? " sel" : "") + (bulk ? " nobulk" : "");
   off.dataset.id = "";
   off.tabIndex = 0;
   off.innerHTML = `<span class="name">Off-Track</span><span class="diff"></span><span class="time"></span><span class="meta">Time not spent on a task</span>`;
@@ -215,6 +392,15 @@ function render() {
   $("#empty").hidden = state.tasks.length > 0;
   $("#finishBtn").disabled = !selTask();
   $("#runBtn").textContent = state.running ? "Pause" : state.totalAccum > 0 ? "Resume" : "Start";
+
+  $("#bulkBtn").textContent = bulk ? "Done selecting" : "Select";
+  $("#bulkBtn").disabled = !bulk && state.tasks.length === 0;
+  $("#bulkBar").hidden = !bulk;
+  $("#bulkCount").textContent = `${bulkSel.size} selected`;
+  $("#bulkAll").textContent = state.tasks.length > 0 && bulkSel.size === state.tasks.length ? "Select none" : "Select all";
+  $("#bulkAll").disabled = state.tasks.length === 0;
+  for (const b of ["#bulkDone", "#bulkOpen", "#bulkReset", "#bulkEst", "#bulkDel"]) $(b).disabled = bulkSel.size === 0;
+
   updateTimes();
 }
 
@@ -264,16 +450,44 @@ $("#finishBtn").onclick = finish;
 $("#addBtn").onclick = () => openTaskDlg(null);
 $("#taskForm").onsubmit = submitTask;
 $("#taskCancel").onclick = () => $("#taskDlg").close();
-$("#settingsBtn").onclick = () => { updateSyncUI(); $("#settingsDlg").showModal(); };
+$("#resetRunBtn").onclick = resetRun;
+$("#resetTimesBtn").onclick = resetTimes;
+$("#bulkBtn").onclick = () => setBulk(!bulk);
+$("#bulkAll").onclick = bulkAll;
+$("#bulkDone").onclick = () => bulkDo("done");
+$("#bulkOpen").onclick = () => bulkDo("open");
+$("#bulkReset").onclick = () => bulkDo("reset");
+$("#bulkEst").onclick = () => bulkDo("est");
+$("#bulkDel").onclick = () => bulkDo("del");
+$("#popBtn").onclick = popOut;
+$("#popBack").onclick = closePip;
+
+$("#settingsBtn").onclick = () => { updateSyncUI(); syncPrefsUI(); $("#settingsDlg").showModal(); };
 $("#settingsClose").onclick = () => $("#settingsDlg").close();
-$("#resetBtn").onclick = resetRun;
-$("#clearBtn").onclick = clearAll;
+
+$("#themeSel").onchange = (e) => { prefs.theme = e.target.value; savePrefs(); applyPrefs(); };
+$("#transChk").onchange = (e) => { prefs.transparent = e.target.checked; savePrefs(); applyPrefs(); };
+$("#topChk").onchange = (e) => {
+  prefs.onTop = e.target.checked;
+  savePrefs();
+  if (prefs.onTop) {
+    $("#settingsDlg").close();
+    popOut();
+  } else {
+    closePip();
+  }
+  updatePopUI();
+};
 
 $("#splits").addEventListener("click", (e) => {
   const li = e.target.closest("li.split");
   if (!li) return;
   const btn = e.target.closest("button[data-act]");
   const id = li.dataset.id;
+  if (bulk) {
+    if (id) toggleBulkId(id);
+    return;
+  }
   if (btn) {
     if (btn.dataset.act === "edit") openTaskDlg(id);
     else if (btn.dataset.act === "del") deleteTask(id);
@@ -290,11 +504,12 @@ $("#splits").addEventListener("keydown", (e) => {
   }
 });
 
-document.addEventListener("keydown", (e) => {
-  if (e.target.closest("input, textarea, dialog")) return;
+function onKey(e) {
+  if (e.target.closest && e.target.closest("input, textarea, select, dialog, button, li.split")) return;
   if (e.code === "Space") { e.preventDefault(); toggleRun(); }
   else if (e.key === "Enter") finish();
-});
+}
+document.addEventListener("keydown", onKey);
 
 /* ---------- Export / Import ---------- */
 $("#exportBtn").onclick = () => {
@@ -318,13 +533,15 @@ $("#importFile").onchange = async (e) => {
   try {
     const raw = JSON.parse(await f.text());
     const s = sanitize(raw.state || raw);
-    if (!confirm("Replace everything on this device with the imported file?")) return;
+    if (!(await ask("Replace everything on this device with the imported file?", "Replace"))) return;
     s.running = false;
     s.segStart = 0;
     state = s;
+    bulk = false;
+    bulkSel.clear();
     save();
   } catch (err) {
-    alert("Import failed: " + err.message);
+    ask("Import failed: " + err.message, "OK", false);
   }
 };
 
@@ -357,8 +574,8 @@ async function initFirebase() {
       import(base + "firebase-auth.js"),
       import(base + "firebase-firestore.js"),
     ]);
-    const app = appM.initializeApp(JSON.parse(cfg));
-    fb = { A, F, auth: A.getAuth(app), db: F.getFirestore(app) };
+    const fbApp = appM.initializeApp(JSON.parse(cfg));
+    fb = { A, F, auth: A.getAuth(fbApp), db: F.getFirestore(fbApp) };
     A.onAuthStateChanged(fb.auth, (u) => {
       user = u;
       u ? startListen() : stopListen();
@@ -436,7 +653,9 @@ $("#signUpBtn").onclick = () => fb && auth("createUserWithEmailAndPassword");
 $("#signOutBtn").onclick = async () => { await fb.A.signOut(fb.auth); };
 
 /* ---------- Boot ---------- */
+applyPrefs();
 render();
+updatePopUI();
 setInterval(updateTimes, 100);
 initFirebase();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
