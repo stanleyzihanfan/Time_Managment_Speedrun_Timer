@@ -17,10 +17,14 @@ try {
   var t = p.theme || "system";
   if (t === "system") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   document.documentElement.dataset.theme = t;
-  document.documentElement.dataset.transparent = String(!!p.transparent);
 } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/tags.css">
+<link rel="stylesheet" href="css/dialogs.css">
+<link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
 <div id="popNote" class="popNote" hidden>
@@ -73,8 +77,38 @@ try {
     <button id="bulkDel" class="danger">Delete</button>
   </section>
 
+  <section class="listbar">
+    <input id="searchBox" type="search" placeholder="Search tasks and tags" aria-label="Search tasks and tags" autocomplete="off">
+    <button id="filterBtn" aria-expanded="false" aria-controls="filterPanel">Filter</button>
+    <select id="sortSel" aria-label="Sort by"></select>
+    <button id="sortDirBtn" aria-label="Sort direction">↑</button>
+  </section>
+  <section id="filterPanel" class="filterPanel" hidden>
+    <label>Status
+      <select id="statusSel">
+        <option value="all">All tasks</option>
+        <option value="open">Not finished</option>
+        <option value="done">Finished</option>
+      </select>
+    </label>
+    <label>Tag match
+      <select id="matchSel">
+        <option value="any">Any selected tag</option>
+        <option value="all">All selected tags</option>
+      </select>
+    </label>
+    <button id="clearFilters">Clear all</button>
+    <div class="filterTagsWrap">
+      <span class="label">Tags</span>
+      <div id="filterTags" class="tags"></div>
+    </div>
+  </section>
+
   <ul id="splits" class="splits"></ul>
-  <p id="empty" class="empty" hidden>No tasks yet. Add one with an estimated time to create your first split.</p>
+  <div id="empty" class="empty" hidden>
+    <span id="emptyText"></span>
+    <button id="emptyClear" hidden>Clear all</button>
+  </div>
 </main>
 
 <dialog id="taskDlg">
@@ -82,6 +116,21 @@ try {
     <h2 id="taskDlgTitle">Add task</h2>
     <label>Name <input id="taskName" required maxlength="80" autocomplete="off"></label>
     <label>Estimated time (minutes) <input id="taskEst" type="number" min="0" step="any" value="25" required inputmode="decimal"></label>
+
+    <div class="tagEditor">
+      <span class="label">Tags</span>
+      <div id="tagList" class="tags"></div>
+      <div id="tagSwatches" class="swatches" role="group" aria-label="Tag color"></div>
+      <div class="tagAddRow">
+        <input id="tagName" placeholder="Tag name (optional)" aria-label="Tag name (optional)" autocomplete="off">
+        <button type="button" id="tagAdd">Add tag</button>
+      </div>
+      <div id="tagSuggestBox" hidden>
+        <span class="label">Existing tags (click to add)</span>
+        <div id="tagSuggest" class="tags"></div>
+      </div>
+    </div>
+
     <div class="row">
       <button type="button" id="taskCancel">Cancel</button>
       <button type="submit" class="primary">Save</button>
@@ -122,7 +171,6 @@ try {
         <option value="light">Light</option>
       </select>
     </label>
-    <label class="check"><input id="transChk" type="checkbox"> Transparent background</label>
     <label class="check"><input id="topChk" type="checkbox"> Always on top (pop-out window)</label>
     <p id="topNote" class="muted"></p>
 
@@ -134,7 +182,11 @@ try {
     <input id="importFile" type="file" accept="application/json,.json" hidden>
 
     <h3>Sync (Firestore)</h3>
-    <p id="syncStatus" class="muted">Not configured.</p>
+    <div id="syncState" class="syncState" data-mode="none">
+      <span id="syncPill" class="pill">Not configured</span>
+      <span id="syncStatus" class="muted"></span>
+    </div>
+    <p id="syncMsg" class="notice" role="status" hidden></p>
     <label>Firebase config
       <textarea id="cfgText" rows="6" spellcheck="false" placeholder='Paste the firebaseConfig object from the Firebase console'></textarea>
     </label>
@@ -157,8 +209,10 @@ try {
     <div class="row"><button id="settingsClose" class="primary">Close</button></div>
   </div>
 </dialog>
+
+<div id="toasts" popover="manual" aria-live="polite"></div>
 </div>
 
-<script src="app.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -1,0 +1,47 @@
+/* Colored tags: chips, color swatches and the tag editor in the task dialog. */
+.c-red { --c: var(--tag-red); }
+.c-orange { --c: var(--tag-orange); }
+.c-yellow { --c: var(--tag-yellow); }
+.c-green { --c: var(--tag-green); }
+.c-blue { --c: var(--tag-blue); }
+.c-purple { --c: var(--tag-purple); }
+.c-gray { --c: var(--tag-gray); }
+
+.tags { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.tag {
+  --c: var(--tag-gray);
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  font-size: 12px; line-height: 1.2; padding: 3px 8px 3px 6px; border-radius: 999px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.tag .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.tag .tname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A tag with no name is just a colored dot. */
+.tag.bare { padding: 2px; border: 0; background: none; }
+.tag.bare .dot { width: 12px; height: 12px; }
+
+/* Clickable chips (filter + suggestions) */
+button.tag { min-height: 30px; padding: 4px 10px 4px 8px; font-size: 13px; cursor: pointer; }
+button.tag:hover { background: color-mix(in srgb, var(--c) 28%, transparent); }
+button.tag.on { background: color-mix(in srgb, var(--c) 45%, transparent); border-color: var(--c); font-weight: 600; }
+
+.tag .x {
+  min-height: 0; padding: 0 2px; border: 0; background: none; color: var(--muted);
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.tag .x:hover { background: none; color: var(--text); }
+
+/* Editor inside the task dialog */
+.tagEditor { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch {
+  width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 50%;
+  background: var(--c); border: 2px solid transparent;
+}
+.swatch:hover { background: var(--c); filter: brightness(1.12); }
+.swatch[aria-pressed="true"] { border-color: var(--text); box-shadow: inset 0 0 0 2px var(--dialog); }
+.tagAddRow { display: flex; gap: 8px; }
+.tagAddRow input { flex: 1; min-width: 0; }

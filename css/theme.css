@@ -1,0 +1,57 @@
+/* Colors, fonts and tag colors. Edit these to restyle the whole app. */
+:root {
+  --bg: #1c2331;
+  --panel: #252f43;
+  --panel-hi: #2f3c56;
+  --hover: #374768;
+  --line: #3a4866;
+  --text: #e9edf5;
+  --muted: #8d9ab3;
+  --ahead: #35c97a;
+  --ahead-hi: #4ad98b;
+  --behind: #ff5a52;
+  --gold: #f2c14e;
+  --on-accent: #0e2218;
+  --on-behind: #ffffff;
+  --field: #1c2331;
+  --dialog: #252f43;
+
+  /* Tag colors (Mac-folder style) */
+  --tag-red: #ff5f57;
+  --tag-orange: #ff9f2e;
+  --tag-yellow: #f5cf3d;
+  --tag-green: #34c759;
+  --tag-blue: #4a9cff;
+  --tag-purple: #b06cf0;
+  --tag-gray: #9aa3b5;
+
+  --num: "Bahnschrift", "DIN Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --panel-hi: #e6ebf4;
+  --hover: #d9e0ee;
+  --line: #ccd4e3;
+  --text: #1b2233;
+  --muted: #5b6780;
+  --ahead: #12974f;
+  --ahead-hi: #0f8445;
+  --behind: #d7352d;
+  --gold: #b9801a;
+  --on-accent: #ffffff;
+  --field: #ffffff;
+  --dialog: #ffffff;
+
+  --tag-red: #e5453d;
+  --tag-orange: #e8800c;
+  --tag-yellow: #c9a100;
+  --tag-green: #1fa14a;
+  --tag-blue: #1f7ae0;
+  --tag-purple: #8e4ad6;
+  --tag-gray: #7b8499;
+  color-scheme: light;
+}

@@ -1,0 +1,43 @@
+/* Dialogs, sync status, and toast notifications. */
+dialog { background: var(--dialog); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 0; width: min(92vw, 460px); max-height: 90vh; overflow: auto; }
+dialog::backdrop { background: rgba(8, 12, 20, .65); }
+dialog form, .dlgBody { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+dialog h2 { margin: 0; font-size: 20px; }
+dialog h3 { margin: 10px 0 0; font-size: 16px; }
+.askMsg { margin: 0; font-size: 16px; }
+
+/* Sync state line */
+.syncState { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pill {
+  display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.syncState[data-mode="in"] .pill { background: var(--ahead); border-color: transparent; color: var(--on-accent); }
+.syncState[data-mode="out"] .pill { border-color: var(--gold); color: var(--gold); }
+.syncState[data-mode="unavailable"] .pill { background: var(--behind); border-color: transparent; color: var(--on-behind); }
+
+/* Inline message box (used for the latest sync / sign-in result) */
+.notice { margin: 0; padding: 10px 12px; border-radius: 6px; border-left: 4px solid var(--gold); background: var(--panel-hi); font-size: 14px; font-weight: 600; }
+.notice.success { border-left-color: var(--ahead); background: color-mix(in srgb, var(--ahead) 20%, transparent); }
+.notice.error { border-left-color: var(--behind); background: color-mix(in srgb, var(--behind) 20%, transparent); }
+
+/* Toasts. The container is a popover so it shows above open dialogs too. */
+#toasts {
+  position: fixed; inset: auto 0 calc(16px + env(safe-area-inset-bottom)) 0;
+  width: min(92vw, 420px); margin: 0 auto; padding: 0; border: 0; background: none; overflow: visible; color: inherit;
+}
+.toast {
+  display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 12px 14px; border-radius: 8px;
+  font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+}
+.toast span { flex: 1; }
+.toast.success { background: var(--ahead); color: var(--on-accent); }
+.toast.error { background: var(--behind); color: var(--on-behind); }
+.toast.info { background: var(--panel-hi); color: var(--text); border: 1px solid var(--gold); }
+.toast button { min-height: 32px; padding: 4px 10px; background: rgba(0, 0, 0, .25); color: inherit; border-color: transparent; font-weight: 700; }
+.toast button:hover { background: rgba(0, 0, 0, .4); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toastIn .18s ease-out; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
