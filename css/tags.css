@@ -1,4 +1,8 @@
 /* Colored tags: chips, color swatches and the tag editor in the task dialog. */
+
+/* Default color first, so the .c-<color> rules below can override it. */
+.tag { --c: var(--tag-gray); }
+
 .c-red { --c: var(--tag-red); }
 .c-orange { --c: var(--tag-orange); }
 .c-yellow { --c: var(--tag-yellow); }
@@ -10,7 +14,6 @@
 .tags { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
 .tag {
-  --c: var(--tag-gray);
   display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
   font-size: 12px; line-height: 1.2; padding: 3px 8px 3px 6px; border-radius: 999px;
   color: var(--text);
